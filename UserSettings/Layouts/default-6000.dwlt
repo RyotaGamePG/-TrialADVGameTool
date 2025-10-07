@@ -1067,7 +1067,7 @@ MonoBehaviour:
       scrollPos: {x: 0, y: 0}
       m_SelectedIDs: 
       m_LastClickedID: 0
-      m_ExpandedIDs: f6e6ffff
+      m_ExpandedIDs: 20fbffff
       m_RenameOverlay:
         m_UserAcceptedRename: 0
         m_Name: 
@@ -1252,13 +1252,13 @@ MonoBehaviour:
   m_LastFolders:
   - Assets
   m_LastFoldersGridSize: -1
-  m_LastProjectPath: F:\UnityProject\TrialADVGameTool
+  m_LastProjectPath: F:\UnityProject\TrialADVGameTool\-TrialADVGameTool
   m_LockTracker:
     m_IsLocked: 0
   m_FolderTreeState:
     scrollPos: {x: 0, y: 0}
-    m_SelectedIDs: c4be0000
-    m_LastClickedID: 48836
+    m_SelectedIDs: eaa60000
+    m_LastClickedID: 42730
     m_ExpandedIDs: 00000000eaa60000
     m_RenameOverlay:
       m_UserAcceptedRename: 0

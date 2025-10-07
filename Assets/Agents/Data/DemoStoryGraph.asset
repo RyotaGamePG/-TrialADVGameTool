@@ -1,0 +1,114 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf7cc87845227294989f6d87bd629ac4, type: 3}
+  m_Name: DemoStoryGraph
+  m_EditorClassIdentifier: 
+  _nodes:
+  - _nodeId: intro
+    _title: Demo Intro
+    _nodeType: 0
+    _lines:
+    - _speakerId: Narrator
+      _text: Welcome to the Agents demo.
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 0
+    - _speakerId: Detective
+      _text: Let's collect evidence before the trial.
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 3
+    - _speakerId: Narrator
+      _text: Moving into the investigation phase...
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 0
+    _transitions:
+    - _targetNodeId: investigation
+      _flagRequirements: []
+      _evidenceRequirements: []
+  - _nodeId: investigation
+    _title: Investigation
+    _nodeType: 1
+    _lines:
+    - _speakerId: Detective
+      _text: I just found a badge that looks important.
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 5
+    - _speakerId: Narrator
+      _text: This item might change the momentum in court.
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 0
+    _transitions:
+    - _targetNodeId: trial
+      _flagRequirements: []
+      _evidenceRequirements: []
+  - _nodeId: trial
+    _title: 裁判
+    _nodeType: 2
+    _lines:
+    - _speakerId: Judge
+      _text: Defense, do you have evidence to present?
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 1
+    - _speakerId: Detective
+      _text: This badge will prove our case!
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 5
+    - _speakerId: Judge
+      _text: Very well, let's examine that proof.
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 0
+    _transitions:
+    - _targetNodeId: ending-good
+      _flagRequirements: []
+      _evidenceRequirements:
+      - EvidenceId: evidence-badge
+        RequiredReaction: 5
+    - _targetNodeId: ending-bad
+      _flagRequirements: []
+      _evidenceRequirements: []
+  - _nodeId: ending-good
+    _title: Good Ending
+    _nodeType: 3
+    _lines:
+    - _speakerId: Judge
+      _text: Compelling evidence. Case closed!
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 0
+    - _speakerId: Narrator
+      _text: Agents demo: trial sequence succeeded.
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 0
+    _transitions: []
+  - _nodeId: ending-bad
+    _title: Bad Ending
+    _nodeType: 3
+    _lines:
+    - _speakerId: Judge
+      _text: Insufficient proof. Continue the investigation.
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 0
+    - _speakerId: Narrator
+      _text: Gather the right evidence and try again.
+      _voiceClip: {fileID: 0}
+      _timeline: {fileID: 0}
+      _reactionType: 0
+    _transitions: []

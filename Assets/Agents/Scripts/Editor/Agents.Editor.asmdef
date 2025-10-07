@@ -1,0 +1,17 @@
+{
+    "name": "Agents.Editor",
+    "rootNamespace": "Agents.Editor",
+    "references": [
+        "Agents.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "optionalUnityReferences": []
+}
