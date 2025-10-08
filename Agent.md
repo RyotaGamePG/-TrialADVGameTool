@@ -64,3 +64,463 @@
 - **Flag**：ストーリー分岐・条件制御に使う変数  
 - **Timeline / Signal**：Unity の映像／音声同期演出用仕組み  
 
+
+## ゲームの仕様
+- ダンガンロンパライクな裁判ゲームを作れるツール制作。
+- 裁判パートとノベルゲームパートに分かれている。
+- ノベルゲームはテキストと画像送りを繰り返す。
+- 裁判パートは、キャラクタの証言を大きく表示させて、特定のワードに対して反証などをぶつけれるようする。
+- 証言は字幕帯＋大きなキーワード強調（色・エフェクトで差別化）。
+
+0) 目的・スコープ
+
+目的：ダンガンロンパ系の「議論→反証→要約→判定」体験をローコードで高速構築できる Unity ツールキットを提供する。
+
+非目的：既存ゲームの演出・UI・文言のコピーは行わない。固有名詞は一般化（例：Truth Bullet → Evidence Bullet）し、拡張可能な仕組みとして実装する。
+
+1) 裁判パートのコア設計
+1.1 ステートマシン構成（TrialController）
+
+ステート：Debate → MiniGame?（0..n）→ ClosingArgument → Vote → Judge（成否分岐）
+
+遷移条件は TrialSignal（ScriptableObject 定義）または EventBus 経由のイベントで管理。
+
+失敗（体力ゼロ/制限時間超過）は GameOver 分岐を許容。
+
+public enum TrialState { Idle, Debate, MiniGame, ClosingArgument, Vote, Judge, GameOver }
+public interface ITrialController {
+    TrialState Current { get; }
+    void Begin(TrialContext ctx); 
+    void Next(TrialSignal signal);
+}
+
+1.2 リソースとゲージ
+
+Evidence Bullet（証拠弾）：調査で得た証拠・証言・記録。議論の弱点（WeakPoint）へ射出して反証または同意を行う。
+
+Gauges
+
+Influence（体力）：誤射・ミスで減少、正答や節目で回復可。
+
+Focus（スローモーション）：一時的に時間スケールを下げ、照準＆読解を補助。
+
+Skill（任意）：装備により Focus 消費率・入力猶予などを調整。
+
+1.3 ディスプレイ原則（UI/演出）
+
+中央に字幕帯、キーワードは色/アウトライン/エフェクトで強調。
+
+右側に弾スロット、左上 Influence、左下 Focus。
+
+PortraitController＋Cinemachine で発言者カメラを自動トラッキング。
+
+Timeline/Signal を音声マスターとして同期（ボイス先行・演出追従）。
+
+2) フェーズ別仕様（最小構成→拡張）
+2.1 Debate（ノンストップ議論相当）
+
+目的：流れる発言列の中の WeakPoint に、Evidence Bullet を撃ち込んで「反証」または「同意」する。
+
+要素：
+
+WeakPointType: Contradict, Agree, Custom（拡張）
+
+WhiteNoise（任意）：視界を妨げるノイズテキスト。破壊可能。
+
+速度、WeakPoint 数、ノイズ密度は難度プロファイルで制御。
+
+拡張（V3 相当・任意）：Lie Mode
+
+弾を反転して仮説的な“虚偽”を撃つ。特定箇所でのみ有効。成功で議論が進展、失敗で Influence 減。
+
+2.2 Rebuttal Showdown（斬撃反論系）
+
+目的：相手の主張を切り払い、最終的に決定的証拠でフィニッシュ。
+
+仕様：文字列障害の除去→最終 WeakPoint に正解弾で確定。
+
+2.3 Panic Talk / Rhythm（リズム対話系）
+
+目的：テンポ入力で相手の防御を削り、最後に正しい弾で止め。
+
+2.4 Hangman / Keyword Fill（キーワード補完）
+
+目的：事件の鍵語を文字拾いで完成させ、議論の進行を補助。
+
+2.5 Logic Dive / Psyche Taxi（推理分岐ラン）
+
+目的：主人公の推理線を分岐選択で整理するアクション。障害回避＋三択でルート確定。
+
+2.6 Closing Argument（推理コミック）
+
+目的：事件の流れをパネルで再構成し、真相提示。正解並びで再生。
+
+2.7 Vote & Judge（投票・判定）
+
+目的：犯人特定。成功/失敗で分岐演出。
+
+段階導入方針：最初は Debate + PanicTalk + Hangman + Closing + Vote を MVP として実装し、その後 Rebuttal/LogicDive/Lie/GroupDebate をプラグインで拡張。
+
+3) データモデル（ScriptableObject / Addressables）
+3.1 Evidence（証拠）
+[CreateAssetMenu(menuName="Agents/Evidence")]
+public class EvidenceSo : ScriptableObject {
+    public string Id;             // "EVD-CH1-001"
+    public string Title;
+    [TextArea] public string Description;
+    public Sprite Icon;
+    public string[] Tags;         // 人物/場所/時間/凶器 等
+    public string[] ValidWeakPointIds; // 命中可能な WeakPoint の参照
+}
+
+3.2 Debate クリップ
+[CreateAssetMenu(menuName="Agents/DebateClip")]
+public class DebateClipSo : ScriptableObject {
+    public string Id;
+    public ActorRef Speaker;
+    [TextArea] public string Text;      // インライン WeakPoint タグ可
+    public float StartTime;
+    public float EndTime;
+    public WeakPointDef[] WeakPoints;   // 位置・種別・許容弾
+    public int WhiteNoiseLevel;
+}
+
+[Serializable]
+public class WeakPointDef {
+    public string WeakPointId; 
+    public WeakPointType Type; // Contradict / Agree / Custom
+    public string[] AcceptEvidenceIds;
+    public bool AcceptLie;     // Lie Mode 許可
+}
+
+3.3 MiniGame 設定
+[CreateAssetMenu(menuName="Agents/MiniGameConfig")]
+public class MiniGameConfigSo : ScriptableObject {
+    public string Id;
+    public MiniGameType Type;      // PanicTalk / Rebuttal / Hangman / LogicDive など
+    public float Speed;
+    public float InputWindow;
+    public int NotesDensity;       // リズム/文字系
+    public float DamagePerMiss;    // Influence 減少
+    public float RewardPerHit;
+}
+
+3.4 Closing Argument
+[CreateAssetMenu(menuName="Agents/ClosingArgument")]
+public class ClosingArgumentSo : ScriptableObject {
+    public string Id;
+    public Sprite[] CandidatePanels;
+    public int[] CorrectOrderIndices; // 解答シーケンス
+    public float PlaybackSpeed;
+}
+
+3.5 難度プロファイル
+[CreateAssetMenu(menuName="Agents/TrialDifficulty")]
+public class TrialDifficultySo : ScriptableObject {
+    public string Id;          // "Normal"/"Hard"
+    public float DebateSpeed;
+    public int MaxWeakPoints;
+    public int WhiteNoiseDensity;
+    public float FocusDrainRate;
+    public float InfluenceDamage;
+    public float InfluenceHeal;
+}
+
+4) ランタイム API（Codex 実装指示）
+4.1 EvidenceService
+public interface IEvidenceService {
+    void Add(EvidenceSo ev);
+    void Remove(string evidenceId);
+    bool Has(string evidenceId);
+    void LoadSet(IEnumerable<EvidenceSo> set);
+    void Equip(string evidenceId);        // 弾装填
+    EvidenceSo Current { get; }
+    IDisposable UseLieMode();             // using(var _=UseLieMode()) { ... }
+}
+
+4.2 DebatePlayer
+public interface IDebatePlayer {
+    void LoadClips(IEnumerable<DebateClipSo> clips);
+    void Play();
+    void Pause();
+    void Stop();
+    event Action<WeakPointDef> OnWeakPointShown;
+    event Action<EvidenceSo, WeakPointDef, bool> OnShotResolved; // 成否
+}
+
+4.3 GaugeSystem / SkillService
+public interface IGaugeSystem {
+    float Influence { get; }
+    float Focus { get; }
+    void AddInfluence(float v);
+    void AddFocus(float v);
+    bool SpendFocus(float v);
+}
+public interface ISkillService {
+    float GetModifier(SkillId id); // e.g. FocusDrainMultiplier
+}
+
+4.4 TrialController（状態遷移）
+public interface ITrialFlow {
+    UniTask RunTrialAsync(TrialContext ctx, CancellationToken ct);
+}
+
+5) エディタ拡張ワークフロー
+5.1 台本インポート（WeakPoint タグ）
+
+台本テキストに <wp id="WP-CH1-003" type="Agree">停電</wp> のようなインラインタグを許可。
+
+インポーターが DebateClipSo.WeakPoints を自動生成。
+
+クリップのタイムはボイスから自動推定 or CSV 指定（startMs,endMs）。
+
+5.2 トラック制御
+
+Timeline に DebateTrack と PortraitTrack。
+
+DebateTrack は DebateClipSo の並びを再生、Signal で OnWeakPointShown を発火。
+
+5.3 Addressables
+
+Evidence/Clip/Config/Argument は Assets/Agents/Data/** に配置し、ラベルで章・事件を管理。
+
+6) 物理・当たり判定（照準＆射撃）
+
+照準はスクリーン座標→単語ビルボード（ワード毎の BoxCollider）へ Raycast。
+
+弾丸は即時・遅延両対応（パラメータ ProjectileTravelTime）。
+
+命中時：EvidenceValidator が evidenceId ∈ WeakPoint.AcceptEvidenceIds を検証。
+
+WhiteNoise は耐久度つき。破壊で視界確保。
+
+7) 難度・バランス
+
+パラメトリック制御（TrialDifficultySo）
+
+発言速度、WeakPoint 数、ノイズ密度、Focus 消費、Influence 増減、入力猶予。
+
+SkillService が乗算係数を供給（例：FocusDrainMultiplier = 0.8f）。
+
+Lie Mode 成否で Influence の回復/減少量を調整可。
+
+8) 生成コード規約（Codex への明示指示）
+
+命名規約：
+
+クラス/メソッド：PascalCase、private フィールド：_camelCase、public フィールド：CamelCase。
+
+ドメイン用語：TrialController, EvidenceService, DebatePlayer などを優先。
+
+配置：
+
+Assets/Agents/Runtime/**（コア）
+
+Assets/Agents/Editor/**（インポーター/ウィザード）
+
+Assets/Agents/Data/**（SO データ）
+
+Assets/Agents/Tests/**（NUnit/PlayMode）
+
+依存：Addressables / Timeline / Cinemachine / （任意）DOTween。
+
+メタコメント：自動生成ファイルの先頭に
+// Generated by agent: YYYY-MM-DD を必須付与。
+
+再利用：既存モジュール参照を最優先。新規追加は最小限。
+
+テスト必須：新規/変更箇所に Unit と Integration を追加。
+
+PR 条件：全テスト緑・スタイルチェック通過・本書の「テスト通過条件」を満たすこと。
+
+GC 抑制：頻出ループでの new/LINQ 乱用禁止。List<T>.Clear() 再利用、Span/ArrayPool 検討可。
+
+音声同期：オーディオがマスター。映像・UI はボイスに追従。
+
+9) テスト通過条件（Acceptance Criteria）
+9.1 単体テスト（例）
+
+EvidenceServiceTests
+
+Add/Remove/Has/Equip の整合性
+
+UseLieMode() のスコープ外自動終了
+
+DebateValidatorTests
+
+evidenceId が WeakPoint.AcceptEvidenceIds に含まれる場合のみ成功
+
+AcceptLie フラグ挙動の検証
+
+GaugeSystemTests
+
+Influence/Focus の加減算と境界（0..Max）
+
+9.2 統合テスト（PlayMode）
+
+成功ルート：
+
+3 つの WeakPoint を正答し、ClosingArgument → Vote → Judge=Success まで到達すること。
+
+失敗ルート：
+
+ミス連発で Influence <= 0 → GameOver 遷移。
+
+フォーカス：
+
+Focus 発動中は Time.timeScale が難度係数で低下し、終了で復帰。
+
+音声同期：
+
+台本クリップの StartTime/EndTime とボイス再生が ±50ms 以内で一致。
+
+9.3 自動検証スクリプト
+
+Assets/Agents/Editor/CI/TrialValidation.cs
+
+全 DebateClipSo の WeakPoint が 存在する Evidence を参照しているか
+
+ClosingArgumentSo の CorrectOrderIndices が範囲外参照しないか
+
+10) エディタ UX（作者向け）
+
+Debate ウィザード：台本（TXT/CSV）→ WeakPoint 抽出 → クリップ化 → Timeline 自動配置。
+
+Evidence パネル：タグ、関連 WeakPoint の可視化、章切替での差分（上書き/追記）管理。
+
+難度プリセット：Easy/Normal/Hard を複製して章固有へ適用。
+
+プレビュー：PlayMode で Focus/Lie の挙動を即時確認。
+
+11) 事件データの最小例（参考）
+# Data/Case1/Trial.yaml（人間が編集→SOへビルドでもOK）
+caseId: CASE-01
+difficulty: Normal
+evidences:
+  - id: EVD-CH1-001
+    title: 停電記録
+    tags: [現場, 時刻]
+    validWeakPoints: [WP-1, WP-3]
+debateClips:
+  - id: CLIP-1
+    speaker: ACT-SuspectA
+    text: "現場はずっと<wp id='WP-1' type='Contradict'>真っ暗</wp>だったんだ！"
+    start: 1.00
+    end: 6.00
+    whiteNoiseLevel: 2
+closing:
+  id: CLOSE-1
+  candidatePanels: [P0,P1,P2,P3]
+  correctOrderIndices: [2,0,3,1]
+
+12) パフォーマンス・制約
+
+GC 抑制：弾・ノイズ・字幕はオブジェクトプール。文字当たり判定は事前ビルボード化。
+
+モバイル考慮：音声圧縮（Vorbis/ADPCM 適切化）、I/O 非同期、UI ドローコール削減。
+
+セキュリティ：API キーは外部設定（ScriptableObject/環境変数）で注入。
+
+サードパーティ：バージョン固定。更新時は回帰テスト必須。
+
+13) コミット / PR / 自動チェック
+
+コミットメッセージ：[Trial] ImplementDebatePlayer の形式。
+
+PR 必須項目：
+
+変更点サマリ
+
+テスト結果（スクリーンショット可）
+
+影響範囲（モジュール/シーン）
+
+既知の制限/フォローアップ
+
+Linter/Formatter：EditorConfig / Roslyn Analyzer を適用。
+
+ドキュメント：機能変更時は README.md と AGENTS.md を更新。
+
+14) Codex への具体的タスク指示テンプレート
+
+タスク：Debate MVP 実装
+
+生成ファイル（例）
+
+Assets/Agents/Runtime/Trial/TrialController.cs
+
+Assets/Agents/Runtime/Trial/Debate/DebatePlayer.cs
+
+Assets/Agents/Runtime/Services/EvidenceService.cs
+
+Assets/Agents/Runtime/UI/DebateHud.prefab（生成不可なら仮スクリプト）
+
+Assets/Agents/Tests/Runtime/DebateValidatorTests.cs
+
+実装要件
+
+上記 API シグネチャに準拠
+
+// Generated by agent: YYYY-MM-DD コメント付与
+
+DebateClipSo 再生→WeakPoint 表示→Shot 判定→TrialSignal 送出
+
+Focus/Lie をフラグと係数で制御
+
+テスト要件
+
+単体 3 本、統合 1 本（9.1/9.2 に準拠）
+
+受け入れ基準
+
+PlayMode で 1 ループ成功・失敗分岐の両方確認
+
+CI の TrialValidation 成功
+
+タスク：Closing Argument 実装
+
+ドラッグ＆ドロップでパネル配置→正誤検証→自動再生。
+
+単体：順序検証、重複チェック／統合：成功→Vote 遷移。
+
+タスク：難度プロファイル対応
+
+TrialDifficultySo で DebateSpeed/WhiteNoiseDensity/FocusDrainRate を適用。
+
+3 プリセット生成＆テスト。
+
+15) 用語（一般化）
+
+Evidence Bullet：証拠弾（従来 Truth Bullet 相当・一般化名称）
+
+WeakPoint：反証/同意が可能な発言の要点
+
+Focus：時間遅延リソース
+
+Lie Mode：仮説的“虚偽”で議論を揺らす拡張ギミック
+
+Closing Argument：事件の流れをパネルで要約提示
+
+Panic Talk / Rebuttal / Logic Dive / Hangman：各ミニゲームの一般化名
+
+付録 A: フォルダ構成（推奨）
+Assets/Agents/
+  Runtime/
+    Trial/
+      Core/
+      Debate/
+      MiniGames/
+      Closing/
+    Services/
+    UI/
+  Editor/
+    Importers/
+    Windows/
+    CI/
+  Data/
+    Case1/
+  Tests/
+    Runtime/
+    PlayMode/
+
+

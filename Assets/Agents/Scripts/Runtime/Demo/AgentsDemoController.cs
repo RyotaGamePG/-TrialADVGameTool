@@ -183,7 +183,7 @@ namespace Agents.Runtime.Demo
 
             if (_awaitingTransition)
             {
-                UpdateBodyText($"[{_currentNodeId}] Transitioning… please wait.");
+                UpdateBodyText($"[{_currentNodeId}] Transitioning窶ｦ please wait.");
                 return;
             }
 
@@ -201,7 +201,7 @@ namespace Agents.Runtime.Demo
             if (line == null)
             {
                 _awaitingTransition = true;
-                UpdateBodyText($"[{_currentNodeId}] Node complete. Pending next action…");
+                UpdateBodyText($"[{_currentNodeId}] Node complete. Pending next action窶ｦ");
                 return;
             }
 
@@ -249,19 +249,19 @@ namespace Agents.Runtime.Demo
             switch (evt.NodeId)
             {
                 case "intro":
-                    UpdateBodyText("Investigation unlocked. Preparing scene…");
+                    UpdateBodyText("Investigation unlocked. Preparing scene窶ｦ");
                     trialController.SubmitReaction(ReactionType.None, string.Empty);
                     break;
 
                 case "investigation":
                     _evidenceService.TryDiscoverEvidence("evidence-badge");
                     RefreshEvidencePanel();
-                    UpdateBodyText("Evidence added: Agent Badge. Moving to trial…");
+                    UpdateBodyText("Evidence added: Agent Badge. Moving to trial窶ｦ");
                     trialController.SubmitReaction(ReactionType.None, string.Empty);
                     break;
 
                 case "trial":
-                    UpdateBodyText("Presenting badge to the court…");
+                    UpdateBodyText("Presenting badge to the court窶ｦ");
                     trialController.SubmitReaction(ReactionType.PresentEvidence, "evidence-badge");
                     break;
 
